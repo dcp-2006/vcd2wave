@@ -41,6 +41,6 @@ module test_fsm();
     initial begin
         $dumpfile("fsm.vcd");
         $dumpvars(0, test_fsm);
-        #200 $finish;
+        #5000 $finish;
     end
 endmodule

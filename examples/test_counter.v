@@ -25,6 +25,6 @@ module test_counter();
     initial begin
         $dumpfile("counter.vcd");
         $dumpvars(0, test_counter);
-        #200 $finish;
+        #5000 $finish;
     end
 endmodule
