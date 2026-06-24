@@ -490,26 +490,36 @@ function toggleCompare() {
 
 function exportPNG() {
   var svg = document.getElementById('waveSvg');
-  var svgRect = svg.getBoundingClientRect();
+  var w = parseFloat(svg.getAttribute('width')) || 1200;
+  var viewBox = svg.getAttribute('viewBox');
+  var parts = viewBox ? viewBox.split(/\s+/).map(parseFloat) : [0,0,w,600];
+  var vw = parts[2] || w, vh = parts[3] || 600;
+  var scale = 2;
+  var cw = Math.round(vw * scale), ch = Math.round(vh * scale);
   var data = (new XMLSerializer()).serializeToString(svg);
-  var scale = 300 / 96;
-  var cw = Math.round(svgRect.width * scale);
-  var ch = Math.round(svgRect.height * scale);
+  var blob = new Blob([data], {type:'image/svg+xml;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
   var canvas = document.createElement('canvas');
   canvas.width = cw; canvas.height = ch;
   var ctx = canvas.getContext('2d');
   ctx.scale(scale, scale);
   ctx.fillStyle = theme==='dark'?'#1a1a2e':'#fafafa';
-  ctx.fillRect(0,0,svgRect.width,svgRect.height);
+  ctx.fillRect(0,0,vw,vh);
   var img = new Image();
   img.onload = function() {
-    ctx.drawImage(img,0,0,svgRect.width,svgRect.height);
+    ctx.drawImage(img,0,0,vw,vh);
+    URL.revokeObjectURL(url);
     canvas.toBlob(function(b) {
       var a = document.createElement('a');
-      a.href = URL.createObjectURL(b); a.download = 'waveform.png'; a.click();
+      a.href = URL.createObjectURL(b);
+      a.download = 'waveform.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     },'image/png');
   };
-  img.src = URL.createObjectURL(new Blob([data],{type:'image/svg+xml'}));
+  img.onerror = function() { alert('PNG export failed - try SVG export instead.'); };
+  img.src = url;
 }
 
 function exportSVG() {
