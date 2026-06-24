@@ -35,7 +35,8 @@ def main():
     print(f"[+] Output: {html_path}")
 
     if sys.platform == "win32":
-        os.startfile(html_path)
+        # Force use Edge, not system default (which may be Quark)
+        os.system(f'start msedge "{html_path}"')
 
 
 if __name__ == "__main__":
