@@ -112,14 +112,20 @@ def gen_html(signals, max_time, title="Waveform"):
                 except:
                     hex_val = binary_str
                 trans.append((t, hex_val))
-        sig_data.append({"name": disp_name, "width": w, "trans": trans})
+        raw_trans = []
+        for t2, v2 in vals:
+            if w == 1:
+                raw_trans.append((t2, "1" if v2 in ("1",) else "0"))
+            else:
+                raw_trans.append((t2, v2))
+        sig_data.append({"name": disp_name, "width": w, "trans": trans, "raw": raw_trans})
 
     sig_json = json.dumps(sig_data)
     num_sigs = len(sig_data)
 
     JS_CODE = r"""
-const sigData = SIG_DATA_PLACEHOLDER;
-const maxTime = MAX_TIME_PLACEHOLDER;
+let sigData = SIG_DATA_PLACEHOLDER;
+let maxTime = MAX_TIME_PLACEHOLDER;
 const ROW_H = ROW_H_PLACEHOLDER;
 const LABEL_W = LABEL_W_PLACEHOLDER;
 let zoom = 100;
@@ -128,6 +134,32 @@ let annotations = [];
 let annId = 0;
 // Standalone mode: if no embedded sigData, show file picker
 let isStandalone = sigData.length === 0;
+// Radix for all bus signals
+let busRadix = 2; // 2, 8, 10, 16
+const radixLabels = {2:'BIN', 8:'OCT', 10:'DEC', 16:'HEX'};
+
+function fmtBus(binStr) {
+  if (!binStr || binStr.replace(/0/g,'').replace(/1/g,'') !== '') return binStr;
+  try {
+    var dec = parseInt(binStr, 2);
+    if (busRadix === 8) return dec.toString(8);
+    if (busRadix === 10) return dec.toString(10);
+    if (busRadix === 16) return dec.toString(16).toUpperCase();
+    return binStr; // bin
+  } catch(e) { return binStr; }
+}
+
+function cycleRadix() {
+  var order = [2, 8, 10, 16];
+  for (var i = 0; i < order.length; i++) {
+    if (order[i] === busRadix) {
+      busRadix = order[(i + 1) % order.length];
+      break;
+    }
+  }
+  document.getElementById('radixBtn').textContent = radixLabels[busRadix];
+  draw();
+}
 // Cursors for measurement
 let cursors = []; // {time, color, label}
 let activeCursor = null;
@@ -210,7 +242,7 @@ function draw() {
         var x1 = prevT*px+LABEL_W, x2 = t*px+LABEL_W;
         if (isBus) {
           html += '<rect x="' + x1 + '" y="' + (y0+4) + '" width="' + Math.max(4,x2-x1) + '" height="' + (ROW_H-8) + '" fill="' + (suffix?'#fef3e2':busF) + '" stroke="' + (suffix?'#e17055':busS) + '" stroke-width="0.5" rx="2"/>';
-          if (x2-x1>20) html += '<text x="' + (x1+4) + '" y="' + (y0+ROW_H/2+4) + '" font-size="10" font-family="Consolas" fill="' + (suffix?'#d35400':busT) + '">' + prevV + '</text>';
+          if (x2-x1>20) { var rv = sig.raw && sig.raw[j] ? sig.raw[j][1] : prevV; html += '<text x="' + (x1+4) + '" y="' + (y0+ROW_H/2+4) + '" font-size="10" font-family="Consolas" fill="' + (suffix?'#d35400':busT) + '">' + fmtBus(rv) + '</text>'; }
         } else {
           var lvl = y0 + (prevV==='1'?6:ROW_H-6);
           html += '<line x1="' + x1 + '" y1="' + lvl + '" x2="' + x2 + '" y2="' + lvl + '" stroke="' + sc + '" stroke-width="1.5"/>';
@@ -221,6 +253,7 @@ function draw() {
       var xEnd = maxTime*px+LABEL_W;
       if (isBus) {
         html += '<rect x="' + (prevT*px+LABEL_W) + '" y="' + (y0+4) + '" width="' + Math.max(4,xEnd-prevT*px-LABEL_W) + '" height="' + (ROW_H-8) + '" fill="' + (suffix?'#fef3e2':busF) + '" stroke="' + (suffix?'#e17055':busS) + '" stroke-width="0.5" rx="2"/>';
+        if (xEnd-prevT*px-LABEL_W>20) { var lrv = sig.raw && sig.raw[sig.raw.length-1] ? sig.raw[sig.raw.length-1][1] : prevV; html += '<text x="' + (prevT*px+LABEL_W+4) + '" y="' + (y0+ROW_H/2+4) + '" font-size="10" font-family="Consolas" fill="' + (suffix?'#d35400':busT) + '">' + fmtBus(lrv) + '</text>'; }
       } else {
         var lvl = y0+(prevV==='1'?6:ROW_H-6);
         html += '<line x1="' + (prevT*px+LABEL_W) + '" y1="' + lvl + '" x2="' + xEnd + '" y2="' + lvl + '" stroke="' + sc + '" stroke-width="1.5"/>';
@@ -675,6 +708,7 @@ body {{font-family:'Segoe UI','Consolas',monospace;background:#fafafa;color:#2c3
   <span class="title">{title}</span>
   <span class="info">{num_sigs} signals | {max_time} ps</span>
   <button id="openBtn" onclick="openVCD()">&#128194; Open</button>
+  <button id="radixBtn" onclick="cycleRadix()" class="primary">BIN</button>
   <div class="sep"></div>
   <button onclick="zoomIn()">[+]</button>
   <span class="zoom-label" id="zoomLabel">100%</span>
