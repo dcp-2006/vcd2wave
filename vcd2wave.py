@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-vcd2wave - VCD波形文件转HTML可视化工具
-把ModelSim/Vivado/iverilog生成的VCD转成浏览器能看的波形图
+vcd2wave - Convert VCD waveform files to interactive HTML visualizations.
 
 Usage:
     python vcd2wave.py <input.vcd> [output.html]

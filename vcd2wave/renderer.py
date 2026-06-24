@@ -222,7 +222,7 @@ body {{font-family:'Segoe UI','Consolas',monospace;background:#fafafa}}
 </div>
 
 <script>{JS_CODE}</script>
-<div class="footer">vcd2wave - waveform visualizer</div>
+<div class="footer">vcd2wave &mdash; VCD waveform visualizer</div>
 </body></html>"""
 
     return html

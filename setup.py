@@ -6,8 +6,8 @@ with open("README.md", "r", encoding="utf-8") as f:
 setup(
     name="vcd2wave",
     version="1.0.0",
-    author="d1985",
-    description="VCD waveform to HTML visualizer - lightweight and dependency-free",
+    author="dcp-2006",
+    description="Convert VCD waveform files to interactive HTML visualizations.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/d1985/vcd2wave",

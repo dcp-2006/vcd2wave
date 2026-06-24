@@ -1,4 +1,4 @@
-"""vcd2wave - VCD waveform to HTML visualizer."""
+"""vcd2wave - Convert VCD waveform files to interactive HTML visualizations."""
 
 from .parser import parse_vcd
 from .renderer import gen_html

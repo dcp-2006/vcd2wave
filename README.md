@@ -1,78 +1,116 @@
 # vcd2wave
 
-将 VCD (Value Change Dump) 波形文件转换为美观的 HTML 可视化页面的轻量级工具。
+**VCD (Value Change Dump) to HTML waveform visualizer.**
 
-不再需要打开笨重的 EDA 工具来看波形——一条命令，浏览器里直接看。
+A lightweight, zero-dependency Python tool that converts VCD files from EDA tools (ModelSim, Vivado, iverilog, etc.) into interactive HTML waveform views. No more firing up heavy EDA software just to glance at a waveform.
 
-## ✨ 特性
+[![Python Tests](https://github.com/dcp-2006/vcd2wave/actions/workflows/python-test.yml/badge.svg)](https://github.com/dcp-2006/vcd2wave/actions/workflows/python-test.yml)
+![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-- 🚀 **零依赖** — 纯 Python 3 标准库，无需安装任何额外包
-- 🎨 **美观输出** — 生成干净、可交互的 HTML 波形页面
-- 📊 **多信号支持** — 单比特、多比特总线信号都能渲染
-- 🔍 **递归解析** — 自动提取顶层及子模块的所有信号
-- ⏱️ **自适应时间轴** — 自动缩放，ns/us/ms 智能切换
-- 📦 **即拿即用** — 单个文件，复制到任何地方都能跑
+---
 
-## 🚀 快速开始
+## Features
+
+- **Zero dependencies** — pure Python 3 standard library only
+- **Interactive viewer** — zoom in/out, drag to scroll, resizable
+- **Multi-signal support** — single-bit, multi-bit buses, hierarchical scopes
+- **Smart time axis** — auto-scales between ps/ns/us/ms
+- **Portable** — single-file CLI, or install as a package
+- **EDA tool agnostic** — works with any tool that outputs standard VCD
+
+## Quick Start
 
 ```bash
-# 基本用法
+# One-shot conversion
 python vcd2wave.py dump.vcd
 
-# 指定输出文件名
-python vcd2wave.py dump.vcd my_waveform.html
+# Specify output path
+python vcd2wave.py dump.vcd output.html
 
-# 批量转换 (PowerShell)
-Get-ChildItem *.vcd | ForEach-Object { python vcd2wave.py $_ }
+# Install system-wide
+pip install .
+vcd2wave dump.vcd
 ```
 
-转换完成后会自动在浏览器中打开生成的 HTML 文件。
+The generated HTML opens automatically in your browser.
 
-## 📋 示例
+## Examples
 
 ```bash
-# 使用 iverilog 生成 VCD 并查看
-iverilog -o test.vvp test.v tb_test.v
-vvp test.vvp -lxt2
-python vcd2wave.py dump.vcd
+# Using iverilog
+iverilog -o sim.vvp test.v tb.v
+vvp sim.vvp
+vcd2wave dump.vcd
+
+# Using ModelSim (via DO script)
+# vsim -c top -do "log -r /*; run 1us; vcd file out.vcd; vcd add -r /*; quit"
+vcd2wave out.vcd
 ```
 
-## 🧪 测试
+## Output Preview
 
-```bash
-python -m pytest tests/
-```
+The generated HTML features:
+- A sticky toolbar with zoom controls (+/−, slider, reset)
+- Horizontal scroll and mouse-drag panning
+- Color-coded signal rows (single-bit vs. bus)
+- Auto-scaled grid lines with time labels
+- Responsive layout, works in any modern browser
 
-## 📁 项目结构
+## Project Structure
 
 ```
 vcd2wave/
-├── vcd2wave/          # 核心模块
+├── vcd2wave/              # Core package
 │   ├── __init__.py
-│   ├── parser.py      # VCD 解析器
-│   └── renderer.py    # HTML 渲染器
-├── tests/             # 单元测试
-├── examples/          # 示例文件
-├── .github/           # CI 配置
+│   ├── parser.py          # VCD file parser
+│   └── renderer.py        # HTML/SVG renderer
+├── tests/                 # Unit tests
+├── examples/              # Example VCD files and testbenches
+│   ├── test_counter.v
+│   ├── test_fsm.v
+│   ├── counter.vcd
+│   └── fsm.vcd
+├── .github/workflows/     # CI config
 ├── README.md
 ├── LICENSE
 ├── setup.py
 └── .gitignore
 ```
 
-## 🔧 技术细节
+## Technical Details
 
-VCD 解析器支持：
-- `$var` 定义的标量和向量信号
-- 嵌套 `$scope` / `$upscope` 层次结构
-- 标量值变化 (`0`, `1`, `x`, `z`)
-- 向量值变化 (`b` 格式)
-- 时间戳 (`#` 格式)
+The parser handles:
+- `$var` declarations for both scalar and vector signals
+- Nested `$scope` / `$upscope` hierarchies
+- Scalar value changes (`0`, `1`, `x`, `z`)
+- Vector value changes (`b` binary format)
+- Timestamp events (`#` format)
 
-## 📄 许可证
+The renderer generates pure SVG/HTML — no JavaScript libraries required.
 
-MIT License — 自由使用、修改和分发。
+## Installation
 
----
+```bash
+# From source
+git clone https://github.com/dcp-2006/vcd2wave.git
+cd vcd2wave
+pip install .
 
-_Generated with ❤️ by 老婆 for 老公_
+# Or just grab the CLI script
+curl -O https://raw.githubusercontent.com/dcp-2006/vcd2wave/main/vcd2wave.py
+```
+
+## Tests
+
+```bash
+python -m pytest tests/
+```
+
+## License
+
+MIT License — see [LICENSE](LICENSE).
+
+## Contributing
+
+Issues and pull requests are welcome. For feature requests, please open an issue first.
