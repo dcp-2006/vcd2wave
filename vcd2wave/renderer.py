@@ -1,4 +1,4 @@
-"""HTML waveform renderer with cursor, annotations, export."""
+"""HTML waveform renderer with annotation panel, markers, export."""
 
 
 def gen_html(signals, max_time, title="Waveform"):
@@ -85,7 +85,6 @@ function draw() {
   var busF = theme==='dark'?'#1a3a2e':'#d5f4e6';
   var busS = theme==='dark'?'#2ecc71':'#27ae60';
   var busT = theme==='dark'?'#2ecc71':'#1a7a4a';
-  var cursorC = '#e74c3c';
 
   document.body.style.background = bg;
   document.getElementById('toolbar').style.background = theme==='dark'?'#16213e':'#fff';
@@ -113,19 +112,11 @@ function draw() {
   // Cursor
   if (cursorVisible && cursorTime >= 0) {
     var cx = cursorTime * px + LABEL_W;
-    html += '<line x1="' + cx + '" y1="0" x2="' + cx + '" y2="' + totalH + '" stroke="' + cursorC + '" stroke-width="2" stroke-dasharray="5,3"/>';
-    html += '<rect x="' + (cx-30) + '" y="0" width="60" height="18" rx="3" fill="' + cursorC + '"/>';
+    html += '<line x1="' + cx + '" y1="0" x2="' + cx + '" y2="' + totalH + '" stroke="#e74c3c" stroke-width="2" stroke-dasharray="5,3"/>';
+    html += '<rect x="' + (cx-30) + '" y="0" width="60" height="18" rx="3" fill="#e74c3c"/>';
     html += '<text x="' + cx + '" y="13" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">' + fmtTime(cursorTime) + '</text>';
-    // Cursor grab handle at bottom
-    html += '<polygon points="' + (cx-8) + ',' + (totalH-4) + ' ' + (cx+8) + ',' + (totalH-4) + ' ' + cx + ',' + totalH + '" fill="' + cursorC + '"/>';
-  }
-
-  // Existing markers
-  var markers = annotations.filter(function(a){return a.type==='marker';});
-  for (var m=0; m<markers.length; m++) {
-    var mx = markers[m].time * px + LABEL_W;
-    html += '<line x1="' + mx + '" y1="26" x2="' + mx + '" y2="' + totalH + '" stroke="#e17055" stroke-width="1.5" stroke-dasharray="4,3"/>';
-    html += '<text x="' + (mx+3) + '" y="' + (totalH-6) + '" font-size="9" fill="#e17055">' + markers[m].label + '</text>';
+    // Drag handle
+    html += '<polygon points="' + (cx-8) + ',' + (totalH-4) + ' ' + (cx+8) + ',' + (totalH-4) + ' ' + cx + ',' + totalH + '" fill="#e74c3c"/>';
   }
 
   // Signal rows
@@ -137,11 +128,9 @@ function draw() {
     html += '<rect x="0" y="' + y0 + '" width="100%" height="' + ROW_H + '" fill="' + rowBg + '"/>';
     var lc = isBus?'#3498db':textC;
     html += '<text x="8" y="' + (y0+ROW_H/2+4) + '" font-size="11" font-weight="600" fill="' + lc + '">' + sig.name + '</text>';
-
     var trans = sig.trans;
     if (!trans||trans.length===0) continue;
     var prevT = trans[0][0], prevV = trans[0][1];
-
     for (var j=0; j<trans.length; j++) {
       var t = trans[j][0], v = trans[j][1];
       var x1 = prevT*px+LABEL_W, x2 = t*px+LABEL_W;
@@ -168,16 +157,40 @@ function draw() {
     }
   }
 
-  // Annotations (notes)
-  var notes = annotations.filter(function(a){return a.type==='note';});
-  for (var n=0; n<notes.length; n++) {
-    var nx = notes[n].time*px+LABEL_W;
-    var ny = notes[n].sigIdx*ROW_H+28;
-    html += '<rect x="' + nx + '" y="' + (ny-16) + '" width="' + Math.min(160,notes[n].label.length*7+8) + '" height="16" rx="2" fill="#ffeaa7" stroke="#fdcb6e" stroke-width="1"/>';
-    html += '<text x="' + (nx+3) + '" y="' + (ny-5) + '" font-size="9" fill="#2d3436">' + notes[n].label + '</text>';
+  // === MARKERS: only vertical line, NO text on waveform ===
+  for (var m=0; m<annotations.length; m++) {
+    var mx = annotations[m].time * px + LABEL_W;
+    html += '<line x1="' + mx + '" y1="26" x2="' + mx + '" y2="' + totalH + '" stroke="#e17055" stroke-width="1.5" stroke-dasharray="4,3"/>';
   }
 
   svg.innerHTML = html;
+}
+
+// ===== Annotation Panel (below waveform, no overlap) =====
+function renderAnnPanel() {
+  var panel = document.getElementById('annPanel');
+  var isDark = theme==='dark';
+  panel.style.background = isDark?'#16213e':'#fff';
+  panel.style.borderTop = '1px solid ' + (isDark?'#0f3460':'#dfe6e9');
+
+  if (annotations.length === 0) {
+    panel.innerHTML = '<div class="ann-empty">Click waveform to place cursor, then add notes</div>';
+    return;
+  }
+  var h = '<table><tr><th>Time</th><th>Annotation</th><th></th></tr>';
+  for (var i=0; i<annotations.length; i++) {
+    var a = annotations[i];
+    h += '<tr><td class="ann-time">' + fmtTime(a.time) + '</td><td class="ann-text">' + a.label + '</td>';
+    h += '<td class="ann-del"><button onclick="delAnn(' + i + ')" class="del-btn">✕</button></td></tr>';
+  }
+  h += '</table>';
+  panel.innerHTML = h;
+}
+
+function delAnn(idx) {
+  annotations.splice(idx, 1);
+  renderAnnPanel();
+  draw();
 }
 
 // Zoom
@@ -193,34 +206,30 @@ function zoomUpdate() {
 function scrollLeft() { document.getElementById('waveContainer').scrollLeft-=200; }
 function scrollRight() { document.getElementById('waveContainer').scrollLeft+=200; }
 
-// Theme
 function toggleTheme() {
   theme=theme==='dark'?'light':'dark';
   document.getElementById('themeBtn').textContent=theme==='dark'?'☀ Light':'🌙 Dark';
   draw();
+  renderAnnPanel();
 }
 
-// Cursor: click on waveform to place cursor
 function getTimeFromClick(e) {
   var container = document.getElementById('waveContainer');
   var rect = container.getBoundingClientRect();
-  var scrollX = container.scrollLeft;
-  var clickX = e.clientX - rect.left + scrollX - LABEL_W;
+  var clickX = e.clientX - rect.left + container.scrollLeft - LABEL_W;
   var px = pp();
   if (clickX < 0) clickX = 0;
   var t = Math.round(clickX / px);
-  t = Math.max(0, Math.min(maxTime, t));
-  return t;
+  return Math.max(0, Math.min(maxTime, t));
 }
 
-// SVG click to place cursor
+// Click on SVG to place cursor
 document.addEventListener('DOMContentLoaded', function() {
   var svg = document.getElementById('waveSvg');
   svg.addEventListener('click', function(e) {
-    var t = getTimeFromClick(e);
-    cursorTime = t;
+    cursorTime = getTimeFromClick(e);
     cursorVisible = true;
-    document.getElementById('cursorInfo').textContent = 'Cursor: ' + fmtTime(t);
+    document.getElementById('cursorInfo').textContent = fmtTime(cursorTime);
     draw();
   });
 });
@@ -229,7 +238,6 @@ document.addEventListener('DOMContentLoaded', function() {
 (function() {
   var svg = document.getElementById('waveSvg');
   svg.addEventListener('mousedown', function(e) {
-    // Check if clicking near cursor
     if (!cursorVisible) return;
     var px = pp();
     var cx = cursorTime * px + LABEL_W;
@@ -242,32 +250,26 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   document.addEventListener('mousemove', function(e) {
     if (!isDraggingCursor) return;
-    var t = getTimeFromClick(e);
-    cursorTime = t;
-    document.getElementById('cursorInfo').textContent = 'Cursor: ' + fmtTime(t);
+    cursorTime = getTimeFromClick(e);
+    document.getElementById('cursorInfo').textContent = fmtTime(cursorTime);
     draw();
   });
   document.addEventListener('mouseup', function() { isDraggingCursor = false; });
 })();
 
-function addMarker() {
-  if (!cursorVisible || cursorTime < 0) { alert('Click on the waveform to place the cursor first!'); return; }
-  var label = prompt('Marker label:', 'M'+(++annId)) || 'M'+annId;
-  annotations.push({type:'marker', time:cursorTime, label:label});
-  draw();
-}
-
 function addNote() {
-  if (!cursorVisible || cursorTime < 0) { alert('Click on the waveform to place the cursor first!'); return; }
-  var text = prompt('Annotation text:');
+  if (!cursorVisible || cursorTime < 0) { alert('Click on the waveform to place cursor first!'); return; }
+  var text = prompt('Annotation:');
   if (!text) return;
-  annotations.push({type:'note', time:cursorTime, sigIdx:0, label:text});
+  annotations.push({time:cursorTime, label:text});
+  renderAnnPanel();
   draw();
 }
 
 function clearAnns() {
-  if (!confirm('Clear all markers and annotations?')) return;
+  if (!confirm('Clear all annotations?')) return;
   annotations = [];
+  renderAnnPanel();
   draw();
 }
 
@@ -275,13 +277,11 @@ function exportPNG() {
   var svg = document.getElementById('waveSvg');
   var data = (new XMLSerializer()).serializeToString(svg);
   var canvas = document.createElement('canvas');
-  var scale = 2;
   canvas.width = 1920; canvas.height = 1080;
   var ctx = canvas.getContext('2d');
   ctx.fillStyle = theme==='dark'?'#1a1a2e':'#fafafa';
   ctx.fillRect(0,0,canvas.width,canvas.height);
   var img = new Image();
-  var blob = new Blob([data], {type:'image/svg+xml'});
   img.onload = function() {
     ctx.drawImage(img,0,0,canvas.width,canvas.height);
     canvas.toBlob(function(b) {
@@ -289,7 +289,7 @@ function exportPNG() {
       a.href = URL.createObjectURL(b); a.download = 'waveform.png'; a.click();
     },'image/png');
   };
-  img.src = URL.createObjectURL(blob);
+  img.src = URL.createObjectURL(new Blob([data],{type:'image/svg+xml'}));
 }
 
 function exportSVG() {
@@ -311,6 +311,7 @@ function exportSVG() {
 })();
 
 draw();
+renderAnnPanel();
 """
 
     JS_CODE = JS_CODE.replace("SIG_DATA_PLACEHOLDER", sig_json)
@@ -324,8 +325,8 @@ draw();
 <title>{title}</title>
 <style>
 * {{margin:0;padding:0;box-sizing:border-box}}
-body {{font-family:'Segoe UI','Consolas',monospace;background:#fafafa;color:#2c3e50}}
-.toolbar {{position:sticky;top:0;z-index:100;background:#fff;border-bottom:2px solid #3498db;
+body {{font-family:'Segoe UI','Consolas',monospace;background:#fafafa;color:#2c3e50;height:100vh;display:flex;flex-direction:column}}
+.toolbar {{flex-shrink:0;background:#fff;border-bottom:2px solid #3498db;
   padding:5px 12px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}}
 .toolbar .title {{font-size:14px;font-weight:bold;color:#2c3e50;margin-right:12px}}
 .toolbar .info {{font-size:11px;color:#7f8c8d;margin-right:auto}}
@@ -336,14 +337,28 @@ body {{font-family:'Segoe UI','Consolas',monospace;background:#fafafa;color:#2c3
 .toolbar button.primary:hover {{background:#2980b9}}
 .toolbar button.danger {{background:#e74c3c;color:#fff;border-color:#e74c3c}}
 .toolbar button.danger:hover {{background:#c0392b}}
-.toolbar input[type=range] {{width:100px;vertical-align:middle}}
+.toolbar input[type=range] {{width:80px;vertical-align:middle}}
 .zoom-label {{font-size:11px;color:#7f8c8d;min-width:30px;text-align:center}}
 .sep {{width:1px;height:20px;background:#ddd;margin:0 3px}}
 #cursorInfo {{font-size:11px;color:#e74c3c;font-weight:bold;min-width:80px}}
-.wave-container {{overflow-x:auto;overflow-y:hidden;cursor:grab;border-top:1px solid #ddd}}
+
+.wave-container {{overflow-x:auto;overflow-y:hidden;cursor:grab;flex:1 1 auto}}
 .wave-container:active {{cursor:grabbing}}
 .wave-inner svg {{display:block}}
-.footer {{text-align:center;padding:4px;font-size:10px;color:#95a5a6;border-top:1px solid #eee}}
+
+#annPanel {{flex-shrink:0;max-height:200px;overflow-y:auto;background:#fff;border-top:1px solid #dfe6e9;padding:4px 12px}}
+#annPanel table {{width:100%;border-collapse:collapse;font-size:12px}}
+#annPanel th {{text-align:left;padding:4px 6px;color:#7f8c8d;font-weight:600;font-size:11px;
+  border-bottom:1px solid #dfe6e9;position:sticky;top:0;background:#fff}}
+#annPanel td {{padding:4px 6px;border-bottom:1px solid #f0f0f0}}
+#annPanel .ann-time {{color:#e74c3c;font-weight:600;font-family:Consolas;width:100px}}
+#annPanel .ann-text {{color:#2c3e50}}
+#annPanel .ann-del {{width:30px;text-align:center}}
+#annPanel .ann-empty {{padding:12px 6px;color:#95a5a6;font-size:12px;text-align:center}}
+.del-btn {{background:none;border:none;color:#e74c3c;cursor:pointer;font-size:14px;padding:0 4px}}
+.del-btn:hover {{color:#c0392b}}
+
+.footer {{flex-shrink:0;text-align:center;padding:4px;font-size:10px;color:#95a5a6;border-top:1px solid #eee}}
 </style>
 </head><body>
 
@@ -361,8 +376,7 @@ body {{font-family:'Segoe UI','Consolas',monospace;background:#fafafa;color:#2c3
   <button onclick="scrollRight()">&gt;</button>
   <div class="sep"></div>
   <button id="themeBtn" onclick="toggleTheme()">&#127769; Dark</button>
-  <button onclick="addMarker()">&#9872; Marker</button>
-  <button onclick="addNote()">&#128221; Note</button>
+  <button onclick="addNote()">&#128221; Add Note</button>
   <button onclick="clearAnns()" class="danger">&#10005; Clear</button>
   <div class="sep"></div>
   <button class="primary" onclick="exportPNG()">&#128190; PNG</button>
@@ -372,11 +386,13 @@ body {{font-family:'Segoe UI','Consolas',monospace;background:#fafafa;color:#2c3
 
 <div class="wave-container" id="waveContainer">
   <div class="wave-inner">
-    <svg id="waveSvg" height="{num_sigs * ROW_H + 30}"></svg>
+    <svg id="waveSvg"></svg>
   </div>
 </div>
 
-<div class="footer">Click on waveform to place cursor | Drag cursor handle | Add markers &amp; notes | Export PNG/SVG</div>
+<div id="annPanel"><div class="ann-empty">Click waveform to place cursor, then add notes</div></div>
+
+<div class="footer">Click waveform | Drag cursor | Add notes (shown below) | Export PNG/SVG</div>
 <script>{JS_CODE}</script>
 </body></html>"""
 
