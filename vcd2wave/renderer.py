@@ -112,13 +112,7 @@ def gen_html(signals, max_time, title="Waveform"):
                 except:
                     hex_val = binary_str
                 trans.append((t, hex_val))
-        raw_trans = []
-        for t, v in vals:
-            if w == 1:
-                raw_trans.append((t, "1" if v in ("1",) else "0"))
-            else:
-                raw_trans.append((t, v))
-        sig_data.append({"name": disp_name, "width": w, "trans": trans, "raw": raw_trans})
+        sig_data.append({"name": disp_name, "width": w, "trans": trans})
 
     sig_json = json.dumps(sig_data)
     num_sigs = len(sig_data)
@@ -131,37 +125,9 @@ const LABEL_W = LABEL_W_PLACEHOLDER;
 let zoom = 100;
 let theme = 'light';
 let annotations = [];
-// Radix for bus signals: 2, 8, 10, 16
-let radices = {};
-
-function fmtBusVal(binStr, radix, width) {
-  if (radix === 2) return binStr;
-  if (radix === 8) {
-    try { return parseInt(binStr, 2).toString(8); } catch(e) { return binStr; }
-  }
-  if (radix === 10) {
-    try { return parseInt(binStr, 2).toString(10); } catch(e) { return binStr; }
-  }
-  try { return parseInt(binStr, 2).toString(16).toUpperCase(); } catch(e) { return binStr; }
-}
-
-function getRadix(sigName) {
-  if (radices[sigName] === undefined) radices[sigName] = 16;
-  return radices[sigName];
-}
-
-function cycleRadix(sigName) {
-  var r = getRadix(sigName);
-  var order = [16, 10, 8, 2];
-  for (var i = 0; i < order.length; i++) {
-    if (order[i] === r) {
-      radices[sigName] = order[(i + 1) % order.length];
-      break;
-    }
-  }
-  draw();
-}
 let annId = 0;
+// Standalone mode: if no embedded sigData, show file picker
+let isStandalone = sigData.length === 0;
 // Cursors for measurement
 let cursors = []; // {time, color, label}
 let activeCursor = null;
@@ -232,17 +198,11 @@ function draw() {
       var dn = sig.name;
       if (suffix) dn += ' ' + suffix;
       html += '<text x="8" y="' + (y0+ROW_H/2+4) + '" font-size="11" font-weight="600" fill="' + lc + '">' + dn + '</text>';
-      if (isBus) {
-        var r = getRadix(dn);
-        html += '<rect x="' + (LABEL_W-28) + '" y="' + (y0+8) + '" width="24" height="18" rx="3" fill="#3498db" style="cursor:pointer" onclick="cycleRadix(\'' + dn.replace(/'/g,'') + '\')"/>';
-        html += '<text x="' + (LABEL_W-16) + '" y="' + (y0+20) + '" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff" style="cursor:pointer" onclick="cycleRadix(\'' + dn.replace(/'/g,'') + '\')">' + radixLabels[r] + '</text>';
-      }
       if (suffix) {
         html += '<rect x="' + (LABEL_W-20) + '" y="' + (y0+ROW_H/2-10) + '" width="14" height="14" rx="2" fill="' + colorShift + '"/>';
       }
       var trans = sig.trans;
       if (!trans||trans.length===0) continue;
-      if (!sig.raw && sigData.length > 0 && i < sigData.length) sig.raw = sigData[i].raw;
       var prevT = trans[0][0], prevV = trans[0][1];
       var sc = suffix ? '#e17055' : textC;
       for (var j=0; j<trans.length; j++) {
@@ -250,7 +210,7 @@ function draw() {
         var x1 = prevT*px+LABEL_W, x2 = t*px+LABEL_W;
         if (isBus) {
           html += '<rect x="' + x1 + '" y="' + (y0+4) + '" width="' + Math.max(4,x2-x1) + '" height="' + (ROW_H-8) + '" fill="' + (suffix?'#fef3e2':busF) + '" stroke="' + (suffix?'#e17055':busS) + '" stroke-width="0.5" rx="2"/>';
-          if (x2-x1>20) { var rawV = sig.raw && sig.raw[j] ? sig.raw[j][1] : prevV; html += '<text x="' + (x1+4) + '" y="' + (y0+ROW_H/2+4) + '" font-size="10" font-family="Consolas" fill="' + (suffix?'#d35400':busT) + '">' + fmtWithRadix(rawV, getRadix(dn)) + '</text>'; }
+          if (x2-x1>20) html += '<text x="' + (x1+4) + '" y="' + (y0+ROW_H/2+4) + '" font-size="10" font-family="Consolas" fill="' + (suffix?'#d35400':busT) + '">' + prevV + '</text>';
         } else {
           var lvl = y0 + (prevV==='1'?6:ROW_H-6);
           html += '<line x1="' + x1 + '" y1="' + lvl + '" x2="' + x2 + '" y2="' + lvl + '" stroke="' + sc + '" stroke-width="1.5"/>';
@@ -519,6 +479,38 @@ function loadCompare() {
   input.click();
 }
 
+function openVCD() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.vcd';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var d = parseVCD(ev.target.result);
+        if (!d.signals || d.signals.length === 0) { alert('No signals found'); return; }
+        // Replace sigData with loaded data
+        sigData.length = 0;
+        for (var i = 0; i < d.signals.length; i++) sigData.push(d.signals[i]);
+        maxTime = d.maxTime;
+        isStandalone = false;
+        cursors = []; annotations = []; showCompare = false;
+        document.getElementById('openBtn').textContent = '\ud83d\udcc2 ' + file.name;
+        document.getElementById('welcome').style.display = 'none';
+        document.querySelector('.wave-container').style.display = 'block';
+        document.getElementById('toolbar').style.display = 'flex';
+        document.getElementById('annPanel').style.display = 'block';
+        draw();
+        renderAnnPanel();
+      } catch(ex) { alert('Parse error: ' + ex.message); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
 function toggleCompare() {
   if (showCompare) {
     showCompare = false;
@@ -571,6 +563,34 @@ function exportSVG() {
   a.href = URL.createObjectURL(new Blob([s],{type:'image/svg+xml'}));
   a.download = 'waveform.svg'; a.click();
 }
+
+// Drag & drop VCD files
+document.addEventListener('dragover', function(e) { e.preventDefault(); });
+document.addEventListener('drop', function(e) {
+  e.preventDefault();
+  var file = e.dataTransfer.files[0];
+  if (!file || !file.name.endsWith('.vcd')) { alert('Please drop a .vcd file'); return; }
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var d = parseVCD(ev.target.result);
+      if (!d.signals || d.signals.length === 0) { alert('No signals found'); return; }
+      sigData.length = 0;
+      for (var i = 0; i < d.signals.length; i++) sigData.push(d.signals[i]);
+      maxTime = d.maxTime;
+      isStandalone = false;
+      cursors = []; annotations = []; showCompare = false;
+      document.getElementById('openBtn').textContent = '\ud83d\udcc2 ' + file.name;
+      document.getElementById('welcome').style.display = 'none';
+      document.querySelector('.wave-container').style.display = 'block';
+      document.getElementById('toolbar').style.display = 'flex';
+      document.getElementById('annPanel').style.display = 'block';
+      draw();
+      renderAnnPanel();
+    } catch(ex) { alert('Parse error: ' + ex.message); }
+  };
+  reader.readAsText(file);
+});
 
 // Drag scroll
 (function() {
@@ -628,12 +648,33 @@ body {{font-family:'Segoe UI','Consolas',monospace;background:#fafafa;color:#2c3
 .del-btn {{background:none;border:none;color:#e74c3c;cursor:pointer;font-size:13px;padding:0 3px}}
 .del-btn:hover {{color:#c0392b}}
 .footer {{flex-shrink:0;text-align:center;padding:3px;font-size:10px;color:#95a5a6;border-top:1px solid #eee}}
+
+/* Welcome screen */
+.welcome {{display:flex;align-items:center;justify-content:center;flex:1;background:#fafafa}}
+.welcome-box {{text-align:center;padding:60px}}
+.welcome-icon {{font-size:64px;margin-bottom:16px}}
+.welcome-box h2 {{font-size:28px;color:#2c3e50;margin-bottom:8px}}
+.welcome-box p {{font-size:14px;color:#7f8c8d;margin-bottom:24px}}
+.welcome-btn {{padding:14px 32px;font-size:16px;background:#3498db;color:#fff;border:none;border-radius:8px;cursor:pointer}}
+.welcome-btn:hover {{background:#2980b9}}
+.welcome-hint {{font-size:12px !important;color:#95a5a6 !important;margin-top:16px !important}}
 </style>
 </head><body>
 
-<div class="toolbar" id="toolbar">
+<div class="welcome" id="welcome">
+  <div class="welcome-box">
+    <div class="welcome-icon">&#128187;</div>
+    <h2>vcd2wave</h2>
+    <p>Visualize VCD waveform files in your browser</p>
+    <button class="welcome-btn" onclick="openVCD()">&#128194; Open VCD File</button>
+    <p class="welcome-hint">Or drag & drop a .vcd file anywhere on this page</p>
+  </div>
+</div>
+
+<div class="toolbar" id="toolbar" style="display:{'none' if num_sigs == 0 else 'flex'}">
   <span class="title">{title}</span>
   <span class="info">{num_sigs} signals | {max_time} ps</span>
+  <button id="openBtn" onclick="openVCD()">&#128194; Open</button>
   <div class="sep"></div>
   <button onclick="zoomIn()">[+]</button>
   <span class="zoom-label" id="zoomLabel">100%</span>
@@ -655,13 +696,13 @@ body {{font-family:'Segoe UI','Consolas',monospace;background:#fafafa;color:#2c3
   <button class="compare" id="compareBtn" onclick="toggleCompare()">&#2194; Compare</button>
 </div>
 
-<div class="wave-container" id="waveContainer">
+<div class="wave-container" id="waveContainer" style="display:{'none' if num_sigs == 0 else 'block'}">
   <div class="wave-inner">
     <svg id="waveSvg"></svg>
   </div>
 </div>
 
-<div id="annPanel"><div class="ann-empty">Click waveform to place cursors A & B | Drag to measure | Add notes</div></div>
+<div id="annPanel" style="display:{'none' if num_sigs == 0 else 'block'}"><div class="ann-empty">Click waveform to place cursors A & B | Drag to measure | Add notes</div></div>
 
 <div class="footer">Click waveform to place cursor | Two cursors = &#916;t measurement | Compare: load another VCD</div>
 <script>{JS_CODE}</script>
