@@ -275,15 +275,20 @@ function clearAnns() {
 
 function exportPNG() {
   var svg = document.getElementById('waveSvg');
+  var svgRect = svg.getBoundingClientRect();
   var data = (new XMLSerializer()).serializeToString(svg);
+  var scale = 300 / 96;
+  var cw = Math.round(svgRect.width * scale);
+  var ch = Math.round(svgRect.height * scale);
   var canvas = document.createElement('canvas');
-  canvas.width = 1920; canvas.height = 1080;
+  canvas.width = cw; canvas.height = ch;
   var ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
   ctx.fillStyle = theme==='dark'?'#1a1a2e':'#fafafa';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillRect(0,0,svgRect.width,svgRect.height);
   var img = new Image();
   img.onload = function() {
-    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,svgRect.width,svgRect.height);
     canvas.toBlob(function(b) {
       var a = document.createElement('a');
       a.href = URL.createObjectURL(b); a.download = 'waveform.png'; a.click();
