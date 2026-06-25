@@ -694,7 +694,7 @@ body {{font-family:'Segoe UI','Consolas',monospace;background:#fafafa;color:#2c3
 </style>
 </head><body>
 
-<div class="welcome" id="welcome">
+<div class="welcome" id="welcome" style="display:{'none' if num_sigs > 0 else 'flex'}">
   <div class="welcome-box">
     <div class="welcome-icon">&#128187;</div>
     <h2>vcd2wave</h2>
