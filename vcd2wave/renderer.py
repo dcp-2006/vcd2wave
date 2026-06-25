@@ -96,7 +96,7 @@ def gen_html(signals, max_time, title="Waveform"):
     sig_data = []
     for code, sig in ordered:
         vals = sorted(sig["values"], key=lambda x: x[0])
-        disp_name = sig["name"].split(".")[-1]
+        disp_name = sig["name"]
         w = sig["width"]
         trans = []
         for t, v in vals:
