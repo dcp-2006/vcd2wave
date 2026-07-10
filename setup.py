@@ -10,7 +10,7 @@ setup(
     description="Convert VCD waveform files to interactive HTML visualizations.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/d1985/vcd2wave",
+    url="https://github.com/dcp-2006/vcd2wave",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
